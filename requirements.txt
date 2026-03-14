@@ -1,0 +1,14 @@
+torch
+torchvision
+Pillow
+tabulate
+tqdm
+ultralytics
+facenet-pytorch
+requests
+fastapi
+uvicorn
+python-multipart
+easyocr
+jinja2
+aiofiles
