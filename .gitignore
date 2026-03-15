@@ -1,0 +1,96 @@
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# Environment files
+# =========================
+.env
+.env.*
+*.local
+
+# =========================
+# Dependency directories
+# =========================
+node_modules/
+vendor/
+
+# =========================
+# Build outputs
+# =========================
+dist/
+build/
+target/
+out/
+bin/
+obj/
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+.venv/
+venv/
+
+# =========================
+# Java
+# =========================
+*.class
+*.jar
+*.war
+*.ear
+*.log
+
+# =========================
+# .NET / C#
+# =========================
+*.user
+*.suo
+*.userprefs
+*.csproj.user
+*.vbproj.user
+*.dbmdl
+
+# =========================
+# macOS
+# =========================
+.AppleDouble
+.LSOverride
+
+# =========================
+# Temporary files
+# =========================
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# =========================
+# AI
+# =========================
+git_token.txt

@@ -12,6 +12,11 @@
         <h1>Object Detection</h1>
         <p class="subtitle">이미지를 업로드하고 최신 AI 기술로 사물을 탐지해보세요.</p>
 
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTask('detect')">객체 탐지</button>
+            <button class="tab-btn" onclick="switchTask('classify-cat-dog')">개/고양이 분류</button>
+        </div>
+
         <form id="upload-form">
             <div class="upload-section" onclick="document.getElementById('file-input').click()">
                 <i class="fas fa-cloud-upload-alt"></i>
@@ -34,7 +39,7 @@
                     <img id="result-image" src="" alt="Detection result">
                 </div>
                 <div class="info-panel">
-                    <h3>탐지 결과</h3>
+                    <h3 id="result-title">탐지 결과</h3>
                     <div id="detection-info">
                         <ul class="detection-list" id="detection-list">
                             <!-- Results will be injected here -->
@@ -46,6 +51,18 @@
     </div>
 
     <script>
+        let currentTask = 'detect';
+
+        function switchTask(task) {
+            currentTask = task;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.innerText.includes(task === 'detect' ? '객체 탐지' : '개/고양이'));
+            });
+            document.getElementById('result-section').style.display = 'none';
+            document.getElementById('file-name').innerText = '이미지를 클릭하거나 드래그하여 선택하세요';
+            document.getElementById('file-input').value = '';
+        }
+
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (file) {
@@ -70,7 +87,8 @@
             document.getElementById('loading').style.display = 'block';
 
             try {
-                const response = await fetch('/detect-ui', {
+                const endpoint = currentTask === 'detect' ? '/detect-ui' : '/api/v1/classify-cat-dog';
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     body: formData
                 });
@@ -79,21 +97,47 @@
 
                 const data = await response.json();
 
-                // Update Image
-                document.getElementById('result-image').src = data.image_url + '?t=' + new Date().getTime();
-                
-                // Update List
-                const list = document.getElementById('detection-list');
-                list.innerHTML = '';
-                
-                if (data.detections.length === 0) {
-                    list.innerHTML = '<li class="detection-item">탐지된 사물이 없습니다.</li>';
+                if (currentTask === 'detect') {
+                    document.getElementById('result-title').innerText = '탐지 결과';
+                    document.getElementById('result-image').src = data.image_url + '?t=' + new Date().getTime();
+                    document.getElementById('result-image').style.display = 'block';
+                    
+                    const list = document.getElementById('detection-list');
+                    list.innerHTML = '';
+                    
+                    if (data.detections.length === 0) {
+                        list.innerHTML = '<li class="detection-item">탐지된 사물이 없습니다.</li>';
+                    } else {
+                        data.detections.forEach(item => {
+                            const li = document.createElement('li');
+                            li.className = 'detection-item';
+                            li.innerHTML = `
+                                <span class="detection-label">${item.class}</span>
+                                <span class="detection-score">${(item.score * 100).toFixed(1)}%</span>
+                            `;
+                            list.appendChild(li);
+                        });
+                    }
                 } else {
-                    data.detections.forEach(item => {
+                    document.getElementById('result-title').innerText = '분류 결과';
+                    // For classification, we show the uploaded image instead of result image with boxes
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        document.getElementById('result-image').src = e.target.result;
+                        document.getElementById('result-image').style.display = 'block';
+                    };
+                    reader.readAsDataURL(fileInput.files[0]);
+
+                    const list = document.getElementById('detection-list');
+                    list.innerHTML = '';
+                    
+                    data.predictions.forEach(item => {
                         const li = document.createElement('li');
                         li.className = 'detection-item';
+                        // Map labels if necessary, though model uses 'cat', 'dog'
+                        const label = item.label === 'cat' ? '고양이 🐱' : (item.label === 'dog' ? '강아지 🐶' : item.label);
                         li.innerHTML = `
-                            <span class="detection-label">${item.class}</span>
+                            <span class="detection-label">${label}</span>
                             <span class="detection-score">${(item.score * 100).toFixed(1)}%</span>
                         `;
                         list.appendChild(li);

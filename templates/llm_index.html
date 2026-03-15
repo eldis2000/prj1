@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>와이프의 위험한 질문 - 세이프티 가이드</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700&family=Pacifico&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #ff6b9d;
+            --secondary-color: #ff85a1;
+            --bg-gradient: linear-gradient(135deg, #fff5f7 0%, #ffe4e9 100%);
+            --glass-bg: rgba(255, 255, 255, 0.8);
+            --shadow: 0 10px 30px rgba(255, 107, 157, 0.15);
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 30px;
+            padding: 40px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            text-align: center;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            font-family: 'Pacifico', cursive;
+            color: var(--primary-color);
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+        }
+
+        .question-box {
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #444;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 2px 5px rgba(255, 107, 157, 0.05);
+            border: 2px dashed var(--secondary-color);
+        }
+
+        textarea {
+            width: 100%;
+            border: 2px solid #eee;
+            border-radius: 15px;
+            padding: 15px;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: none;
+            box-sizing: border-box;
+            transition: 0.3s;
+            margin-bottom: 20px;
+            outline: none;
+        }
+
+        textarea:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 10px rgba(255, 107, 157, 0.2);
+        }
+
+        .btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            background: #ff4d85;
+            transform: scale(1.02);
+        }
+
+        .btn-secondary {
+            background: #eee;
+            color: #666;
+            font-size: 0.9rem;
+            padding: 10px 20px;
+        }
+
+        .result-box {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 20px;
+            background: white;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .score {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin: 10px 0;
+        }
+
+        .reason {
+            color: #555;
+            line-height: 1.6;
+            font-style: italic;
+        }
+
+        .loading {
+            display: none;
+            margin: 20px 0;
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
+
+        /* Micro-animations */
+        .btn:active { transform: scale(0.98); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Wife's Trap</h1>
+            <p style="color: #888; font-size: 0.9rem; margin-bottom: 20px;">무사히 살아남으시길 바랍니다...</p>
+            
+            <div id="loading" class="loading">생각 중... ❤️</div>
+
+            <div id="game-section">
+                <div id="question" class="question-box">질문을 생성해주세요!</div>
+                <textarea id="answer" rows="3" placeholder="목숨을 건 답변을 입력하세요..."></textarea>
+                <button onclick="evaluateAnswer()" class="btn">답변 제출!</button>
+                <button onclick="getNewQuestion()" class="btn btn-secondary">질문 바꾸기 (위험함)</button>
+            </div>
+
+            <div id="result" class="result-box">
+                <div style="font-size: 0.9rem; color: #aaa;">와이프의 평가점수</div>
+                <div class="score" id="result-score">0</div>
+                <div class="reason" id="result-reason">내용</div>
+                <button onclick="resetGame()" class="btn btn-secondary" style="margin-top: 20px;">다시 도전하기</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.onload = getNewQuestion;
+
+        async function getNewQuestion() {
+            showLoading(true);
+            const response = await fetch('/get-question', { method: 'POST' });
+            const data = await response.json();
+            document.getElementById('question').innerText = data.question;
+            document.getElementById('answer').value = '';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('game-section').style.display = 'block';
+            showLoading(false);
+        }
+
+        async function evaluateAnswer() {
+            const question = document.getElementById('question').innerText;
+            const answer = document.getElementById('answer').value;
+
+            if (!answer.trim()) {
+                alert("침묵은 금이 아니라 유죄입니다. 답변하세요.");
+                return;
+            }
+
+            showLoading(true);
+            
+            const formData = new FormData();
+            formData.append('question', question);
+            formData.append('answer', answer);
+
+            const response = await fetch('/evaluate', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            document.getElementById('result-score').innerText = data.score + " / 10";
+            document.getElementById('result-reason').innerText = data.reason;
+            
+            document.getElementById('game-section').style.display = 'none';
+            document.getElementById('result').style.display = 'block';
+            showLoading(false);
+        }
+
+        function resetGame() {
+            getNewQuestion();
+        }
+
+        function showLoading(isLoading) {
+            document.getElementById('loading').style.display = isLoading ? 'block' : 'none';
+            if (isLoading) {
+                document.getElementById('game-section').style.opacity = '0.3';
+                document.getElementById('game-section').style.pointerEvents = 'none';
+            } else {
+                document.getElementById('game-section').style.opacity = '1';
+                document.getElementById('game-section').style.pointerEvents = 'auto';
+            }
+        }
+    </script>
+</body>
+</html>

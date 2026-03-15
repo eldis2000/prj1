@@ -25,6 +25,9 @@ import easyocr
 # yolo
 from ultralytics import YOLO
 
+# transformers
+from transformers import pipeline
+
 # SSL 인증서 검증 비활성화 (일부 모델 가중치/폰트 다운로드 용도)
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -77,10 +80,14 @@ async def lifespan(app: FastAPI):
     reader = easyocr.Reader(['ko', 'en'], gpu=torch.cuda.is_available())
     ml_models["ocr"] = reader
 
-    # 5. Pose Estimation Model
-    print("Loading YOLOv8n-pose...")
-    pose_model = YOLO('yolov8n-pose.pt')
-    ml_models["pose"] = pose_model
+    # 7. Cat/Dog Classification Model
+    print("Loading Cat/Dog ViT model...")
+    cat_dog_classifier = pipeline(
+        "image-classification",
+        model="akahana/vit-base-cats-vs-dogs",
+        device=0 if torch.cuda.is_available() else -1
+    )
+    ml_models["cat_dog_classifier"] = cat_dog_classifier
     
     print("All models loaded successfully!")
     yield
@@ -101,6 +108,10 @@ async def read_root(request: Request):
 @app.get("/doorbell", response_class=HTMLResponse)
 async def doorbell_page(request: Request):
     return templates.TemplateResponse("doorbell.html", {"request": request})
+
+@app.get("/batch", response_class=HTMLResponse)
+async def batch_page(request: Request):
+    return templates.TemplateResponse("batch.html", {"request": request})
 
 @app.post("/detect-ui")
 async def detect_ui(file: UploadFile = File(...)):
@@ -191,6 +202,73 @@ async def classify_image(file: UploadFile = File(...)):
         })
 
     return {"filename": file.filename, "predictions": results}
+
+@app.post("/api/v1/classify-cat-dog", summary="개/고양이 분류", description="ViT 모델을 이용한 개/고양이 이진 분류")
+async def classify_cat_dog(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents)).convert("RGB")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    classifier = ml_models["cat_dog_classifier"]
+    
+    # HuggingFace pipeline image-classification output format:
+    # [{'label': 'LABEL_0', 'score': 0.99}, {'label': 'LABEL_1', 'score': 0.01}]
+    # Based on the model akahana/vit-base-cats-vs-dogs: 
+    # Usually 0=cat, 1=dog or similar. The model card says labels are 'cat' and 'dog'.
+    
+    results = classifier(image)
+    
+    # Sort by score descending (already sorted by default in pipeline)
+    return {
+        "filename": file.filename,
+        "predictions": results
+    }
+
+@app.get("/api/v1/batch-classify", summary="일괄 분류", description="img/cat, img/dog 폴더의 모든 이미지를 일괄 분류")
+async def batch_classify():
+    import time
+    base_dir = "img"
+    results = []
+    
+    classifier = ml_models["cat_dog_classifier"]
+    
+    for category in ["cat", "dog"]:
+        folder_path = os.path.join(base_dir, category)
+        if not os.path.exists(folder_path):
+            continue
+            
+        for filename in os.listdir(folder_path):
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                file_path = os.path.join(folder_path, filename)
+                try:
+                    image = Image.open(file_path).convert("RGB")
+                    
+                    start_time = time.time()
+                    predictions = classifier(image)
+                    end_time = time.time()
+                    
+                    inference_time = round((end_time - start_time) * 1000, 2) # ms
+                    
+                    # Top prediction
+                    top_pred = predictions[0]
+                    label = top_pred['label']
+                    score = top_pred['score']
+                    
+                    # Result mapping for table
+                    display_label = "고양이 🐱" if label == "cat" else ("강아지 🐶" if label == "dog" else label)
+                    
+                    results.append({
+                        "filename": f"{category}/{filename}",
+                        "label": display_label,
+                        "score": f"{round(score * 100, 2)}%",
+                        "time": f"{inference_time}ms"
+                    })
+                except Exception as e:
+                    print(f"Error processing {file_path}: {e}")
+                    
+    return {"results": results}
 
 @app.post("/api/v1/face-recognize", summary="얼굴 비교 (얼굴 인식)", description="MTCNN & InceptionResnetV1을 이용한 동일 인물 여부 확인")
 async def face_recognize(image1: UploadFile = File(...), image2: UploadFile = File(...), threshold: float = Form(0.6)):
@@ -286,6 +364,30 @@ async def ocr_image(file: UploadFile = File(...)):
         })
 
     return {"filename": file.filename, "detected_texts": results}
+
+@app.post("/api/v1/analyze-sentiment", summary="감정 분석", description="KoELECTRA 모델을 이용한 한국어 문장 감정 분석 (긍정/부정)")
+async def analyze_sentiment(request: Request):
+    try:
+        body = await request.json()
+        text = body.get("text", "")
+        if not text:
+            raise HTTPException(status_code=400, detail="Text is required")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    analyzer = ml_models["sentiment_analyzer"]
+    # pipeline 특성상 단일 텍스트도 리스트로 처리 가능
+    result = analyzer(text)[0]
+    
+    # 모델 출력 레이블 변환 (daekeun-ml/koelectra-small-v3-nsmc는 '0': 부정, '1': 긍정)
+    label_map = {"0": "Negative", "1": "Positive", "LABEL_0": "Negative", "LABEL_1": "Positive"}
+    label = label_map.get(result["label"], result["label"])
+    
+    return {
+        "text": text,
+        "sentiment": label,
+        "confidence": round(result["score"], 4)
+    }
 
 @app.post("/api/v1/doorbell-analyze", summary="지능형 현관 보안 분석", description="방문자 식별(얼굴 인식) 및 택배 감지(객체 탐지) 통합 분석")
 async def doorbell_analyze(file: UploadFile = File(...), threshold: float = Form(0.6)):

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch Image Classification Results</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .batch-container {
+            margin-top: 2rem;
+            width: 100%;
+        }
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 2rem;
+            background: white;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .result-table th, .result-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .result-table th {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 600;
+        }
+        .result-table tr:last-child td {
+            border-bottom: none;
+        }
+        .result-table tr:hover {
+            background-color: #f1f5f9;
+        }
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .badge-cat { background-color: #fef3c7; color: #92400e; }
+        .badge-dog { background-color: #dcfce7; color: #166534; }
+        
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-actions">
+            <h1>Batch Classification</h1>
+            <a href="/" class="btn" style="margin-top: 0;">홈으로</a>
+        </div>
+        <p class="subtitle">img/cat 및 img/dog 폴더의 이미지를 일괄 분석합니다.</p>
+
+        <div style="text-align: center;">
+            <button id="start-batch" class="btn">일괄 분석 시작하기</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>전체 이미지를 분석 중입니다. 잠시만 기다려주세요...</p>
+        </div>
+
+        <div class="batch-container" id="batch-result" style="display: none;">
+            <table class="result-table">
+                <thead>
+                    <tr>
+                        <th>이미지명</th>
+                        <th>개(또는 고양이)</th>
+                        <th>평가메트릭 정확도</th>
+                        <th>속도</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- Results will be injected here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('start-batch').onclick = async () => {
+            const btn = document.getElementById('start-batch');
+            const loading = document.getElementById('loading');
+            const resultSection = document.getElementById('batch-result');
+            const tbody = document.getElementById('table-body');
+
+            btn.disabled = true;
+            loading.style.display = 'block';
+            resultSection.style.display = 'none';
+            tbody.innerHTML = '';
+
+            try {
+                const response = await fetch('/api/v1/batch-classify');
+                if (!response.ok) throw new Error('서버 오류 발생');
+
+                const data = await response.json();
+                
+                data.results.forEach(item => {
+                    const tr = document.createElement('tr');
+                    const badgeClass = item.label.includes('고양이') ? 'badge-cat' : 'badge-dog';
+                    
+                    tr.innerHTML = `
+                        <td>${item.filename}</td>
+                        <td><span class="status-badge ${badgeClass}">${item.label}</span></td>
+                        <td><strong>${item.score}</strong></td>
+                        <td style="color: var(--text-muted); font-size: 0.9rem;">${item.time}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                loading.style.display = 'none';
+                resultSection.style.display = 'block';
+                btn.disabled = false;
+            } catch (error) {
+                alert('분석 중 오류 발생: ' + error.message);
+                loading.style.display = 'none';
+                btn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>
